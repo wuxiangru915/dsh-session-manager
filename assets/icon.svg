@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Session Manager">
+  <defs>
+    <linearGradient id="sm-bg" x1="10" y1="6" x2="54" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3B8BFF"/>
+      <stop offset="1" stop-color="#0B4AA2"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#sm-bg)"/>
+  <rect x="1" y="1" width="62" height="30" rx="14" fill="#FFFFFF" opacity="0.06"/>
+  <rect x="12" y="12" width="40" height="9" rx="4.5" fill="#FFFFFF"/>
+  <rect x="15" y="24" width="34" height="27" rx="7" fill="#FFFFFF" fill-opacity="0.95"/>
+  <rect x="21" y="30" width="22" height="3.6" rx="1.8" fill="#1F6FEB"/>
+  <rect x="21" y="37.5" width="14" height="3.6" rx="1.8" fill="#1F6FEB" fill-opacity="0.7"/>
+  <circle cx="46" cy="46" r="8.2" fill="#0B4AA2" stroke="#8FE6FF" stroke-width="2.5"/>
+  <path d="M46 41.4V46l3.1 2.1" fill="none" stroke="#8FE6FF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
