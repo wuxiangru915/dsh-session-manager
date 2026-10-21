@@ -13,7 +13,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { apply, name, inject } from "../lib/index.js";
+import { ACTIONS, apply, name, inject } from "../lib/index.js";
 
 let pass = 0;
 function ok(label) {
@@ -457,6 +457,53 @@ function post(url, body, headersIn) {
   const r = await post("/dsh-sm/archived/unarchive", {});
   assert.equal(r.status, 500);
   ok("missing sessionId is rejected");
+}
+
+// ---------- contracted action list: host <-> client ----------
+{
+  const clientSource = readFileSync(new URL("../lib/client.js", import.meta.url), "utf8");
+  const called = new Set([...clientSource.matchAll(/\bapi\(\s*"([a-z][a-z/-]+)"/g)].map((match) => match[1]));
+  assert.deepEqual([...called].sort(), [...ACTIONS].sort());
+  for (const action of ACTIONS) {
+    const r = await post("/dsh-sm/" + action, action.includes("list") ? {} : { sessionId: "missing-session" });
+    assert.notEqual(r.status, 404, action + " is advertised but not routed");
+  }
+  ok("every advertised action is routed and the web client calls exactly that list");
+}
+
+// ---------- oversized request bodies ----------
+{
+  const r = await post("/dsh-sm/sessions/list", { blob: "x".repeat(70 * 1024) });
+  assert.equal(r.status, 413);
+  assert.match(r.json.error, /too large/);
+  const small = await post("/dsh-sm/sessions/list", { blob: "x".repeat(1024) });
+  assert.equal(small.status, 200);
+  ok("request bodies above the 64 KiB cap are refused with 413");
+}
+
+// ---------- mutating actions are serialized ----------
+{
+  const original = registry.archiveSession;
+  let active = 0;
+  let maxActive = 0;
+  registry.archiveSession = async function (id) {
+    active += 1;
+    maxActive = Math.max(maxActive, active);
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    active -= 1;
+    return original.call(this, id);
+  };
+  const [first, second] = await Promise.all([
+    post("/dsh-sm/sessions/archive", { sessionId: "lock-a" }),
+    post("/dsh-sm/sessions/archive", { sessionId: "lock-b" })
+  ]);
+  registry.archiveSession = original;
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.equal(maxActive, 1);
+  assert.ok(registry.state.archivedSessionIds.includes("lock-a"));
+  assert.ok(registry.state.archivedSessionIds.includes("lock-b"));
+  ok("concurrent mutations run one at a time instead of racing on stale state");
 }
 
 rmSync(home, { recursive: true, force: true });
