@@ -154,15 +154,33 @@ const services = {
   dshHomePath: (...segments) => join(home, ...segments)
 };
 
-const ctx = {
-  get: (key) => services[key]
-};
+/** The real web server rejects a second route on the same (kind, path). */
+function makeWebServer() {
+  const routes = new Map();
+  return {
+    routes,
+    webServer: {
+      register(route) {
+        if (routes.has(route.path)) throw new Error(`webserver: duplicate ${route.kind} route "${route.path}"`);
+        routes.set(route.path, route);
+        return () => routes.delete(route.path);
+      }
+    }
+  };
+}
 
-// ---------- capture the route ----------
+const host = makeWebServer();
 let captured = null;
-ctx.webServer = {
-  register(route) {
-    captured = route;
+const ctx = {
+  get: (key) => services[key],
+  effect(callback) {
+    return callback();
+  },
+  webServer: {
+    register(route) {
+      captured = route;
+      return host.webServer.register(route);
+    }
   }
 };
 
@@ -171,6 +189,34 @@ assert.deepEqual(inject, ["webServer"]);
 apply(ctx);
 assert.ok(captured && captured.kind === "prefix" && captured.path === "/dsh-sm");
 ok("route registered as /dsh-sm prefix");
+
+// ---------- route ownership: dispose frees the prefix ----------
+{
+  const owned = makeWebServer();
+  const disposers = [];
+  const mount = () =>
+    apply({
+      get: () => undefined,
+      webServer: owned.webServer,
+      effect(callback) {
+        const disposer = callback();
+        if (typeof disposer === "function") disposers.push(disposer);
+        return disposer;
+      }
+    });
+
+  mount();
+  assert.deepEqual([...owned.routes.keys()], ["/dsh-sm"]);
+  for (const disposer of disposers.splice(0)) disposer();
+  assert.equal(owned.routes.size, 0);
+
+  // Regression: a reload used to keep the old prefix and throw on the next apply.
+  mount();
+  assert.deepEqual([...owned.routes.keys()], ["/dsh-sm"]);
+  for (const disposer of disposers.splice(0)) disposer();
+  assert.equal(owned.routes.size, 0);
+  ok("the route is released on dispose and re-applied without a duplicate-prefix error");
+}
 
 // ---------- fake req/res ----------
 function makeReq(method, url, body, headersIn) {

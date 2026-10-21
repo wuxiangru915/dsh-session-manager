@@ -26,6 +26,10 @@ Current DSH returns **listing snapshots** (`{ header, revision, ... }`) from `se
 
 0.2.0 normalizes both the current snapshot shape and the legacy header shape, resolves the real JSONL session directory, and only prunes bookkeeping **after** the directory is removed (or proven absent). If a listed session's artifact cannot be located, delete refuses with an error and leaves every bookkeeping record untouched.
 
+### 0.2.1: the “duplicate prefix route” activation failure
+
+The `/dsh-sm` prefix was registered outside the plugin fiber: `apply()` called `ctx.webServer.register()` directly and never handed the disposer to `ctx.effect()`. Unloading therefore left the prefix in the web server table, and the next load — HMR reload, disable/enable, or a reinstall through the plugin manager — failed activation with `webserver: duplicate prefix route "/dsh-sm"`, while the stale route kept answering requests. 0.2.1 registers the route inside `ctx.effect()`, so the disposer follows the fiber and reloads are clean. The leaked route only exists in the already-running process, so restart `dsh web` once after updating.
+
 ## Features
 
 - **Restore archived sessions**: an archived session keeps its workspace accounting slot, so unarchiving puts it back exactly where it was — single, batch, or all at once.
