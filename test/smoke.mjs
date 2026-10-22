@@ -11,6 +11,7 @@
  */
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ACTIONS, apply, name, inject } from "../lib/index.js";
@@ -471,14 +472,30 @@ function post(url, body, headersIn) {
   ok("every advertised action is routed and the web client calls exactly that list");
 }
 
-// ---------- oversized request bodies ----------
+// ---------- oversized request bodies (over a real socket) ----------
 {
-  const r = await post("/dsh-sm/sessions/list", { blob: "x".repeat(70 * 1024) });
-  assert.equal(r.status, 413);
-  assert.match(r.json.error, /too large/);
-  const small = await post("/dsh-sm/sessions/list", { blob: "x".repeat(1024) });
-  assert.equal(small.status, 200);
-  ok("request bodies above the 64 KiB cap are refused with 413");
+  const server = createServer((req, res) => captured.handler(req, res));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = server.address().port;
+  const url = "http://127.0.0.1:" + port + "/dsh-sm/sessions/list";
+  try {
+    const big = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ blob: "x".repeat(70 * 1024) })
+    });
+    assert.equal(big.status, 413);
+    assert.match((await big.json()).error, /too large/);
+    const small = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ blob: "x".repeat(1024) })
+    });
+    assert.equal(small.status, 200);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+  ok("request bodies above the 64 KiB cap are refused with 413 and a real response");
 }
 
 // ---------- mutating actions are serialized ----------

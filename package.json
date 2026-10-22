@@ -1,6 +1,6 @@
 {
   "name": "@dshwp/dsh-session-manager",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Session manager for the DeepSeek Harness web UI: browse all sessions, archive / unarchive (restore) / delete them, preview conversation content — from the Settings panel, localized with the Harness language. · DSH 会话管理：设置页查看全部与已归档会话，归档 / 恢复 / 删除 / 内容预览，跟随 DSH 语言设置。",
   "type": "module",
   "main": "lib/index.js",

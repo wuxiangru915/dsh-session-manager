@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.3
+
+### Fixed
+
+- **The 64 KiB cap answers `413` instead of resetting the socket.** 0.2.2
+  destroyed the request once it overflowed, which killed the connection before
+  the response could be read — a real boot returned `RemoteDisconnected`
+  instead of `413`. The tail is now dropped and the socket drained, then the
+  route answers normally.
+- The oversized-body test now runs over a real `node:http` socket (it fails
+  with `fetch failed` against the 0.2.2 behaviour) instead of a stub request
+  object that could not model `destroy()`.
+
 ## 0.2.2
 
 Hardening pass, with ideas borrowed from
